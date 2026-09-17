@@ -68,6 +68,10 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".DolbyEffectService"
+            android:exported="false" />
+
         <provider
             android:name=".SummaryProvider"
             android:authorities="co.aospa.dolby.summary">

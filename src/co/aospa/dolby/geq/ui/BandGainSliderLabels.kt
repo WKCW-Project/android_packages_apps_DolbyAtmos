@@ -25,11 +25,11 @@ fun BandGainSliderLabels() {
     Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 8.dp)) {
         LabelText(stringResource(id = R.string.dolby_geq_slider_label_gain))
         Column(modifier = Modifier.height(200.dp), horizontalAlignment = Alignment.End) {
-            LabelText("+10 dB", modifier = Modifier.padding(top = 10.dp))
+            LabelText("+15 dB", modifier = Modifier.padding(top = 10.dp))
             Spacer(modifier = Modifier.weight(1f))
             LabelText("0 dB")
             Spacer(modifier = Modifier.weight(1f))
-            LabelText("-10 dB", modifier = Modifier.padding(bottom = 10.dp))
+            LabelText("-15 dB", modifier = Modifier.padding(bottom = 10.dp))
         }
         LabelText("Hz")
     }

@@ -19,18 +19,26 @@ import androidx.preference.Preference.OnPreferenceChangeListener
 import androidx.preference.PreferenceCategory
 import androidx.preference.SwitchPreferenceCompat
 import co.aospa.dolby.DolbyConstants.Companion.PREF_BASS
+import co.aospa.dolby.DolbyConstants.Companion.PREF_BASS_CURVE
+import co.aospa.dolby.DolbyConstants.Companion.PREF_BASS_LEVEL
+import co.aospa.dolby.DolbyConstants.Companion.PREF_DEVICE_STATE_MEMORY
 import co.aospa.dolby.DolbyConstants.Companion.PREF_DIALOGUE
 import co.aospa.dolby.DolbyConstants.Companion.PREF_ENABLE
 import co.aospa.dolby.DolbyConstants.Companion.PREF_HP_VIRTUALIZER
 import co.aospa.dolby.DolbyConstants.Companion.PREF_IEQ
+import co.aospa.dolby.DolbyConstants.Companion.PREF_MID
+import co.aospa.dolby.DolbyConstants.Companion.PREF_MID_LEVEL
 import co.aospa.dolby.DolbyConstants.Companion.PREF_PRESET
 import co.aospa.dolby.DolbyConstants.Companion.PREF_PROFILE
 import co.aospa.dolby.DolbyConstants.Companion.PREF_RESET
 import co.aospa.dolby.DolbyConstants.Companion.PREF_SPK_VIRTUALIZER
 import co.aospa.dolby.DolbyConstants.Companion.PREF_STEREO
+import co.aospa.dolby.DolbyConstants.Companion.PREF_TREBLE
+import co.aospa.dolby.DolbyConstants.Companion.PREF_TREBLE_LEVEL
 import co.aospa.dolby.DolbyConstants.Companion.PREF_VOLUME
 import co.aospa.dolby.DolbyConstants.Companion.dlog
 import co.aospa.dolby.DolbyController
+import co.aospa.dolby.DolbyEffectService
 import co.aospa.dolby.R
 import com.android.settingslib.widget.MainSwitchPreference
 import com.android.settingslib.widget.SettingsBasePreferenceFragment
@@ -43,12 +51,23 @@ class DolbySettingsFragment : SettingsBasePreferenceFragment(), OnPreferenceChan
     private val ieqPref by lazy { findPreference<DolbyIeqPreference>(PREF_IEQ)!! }
     private val dialoguePref by lazy { findPreference<ListPreference>(PREF_DIALOGUE)!! }
     private val bassPref by lazy { findPreference<SwitchPreferenceCompat>(PREF_BASS)!! }
+    private val bassLevelPref by lazy { findPreference<DolbySliderPreference>(PREF_BASS_LEVEL)!! }
+    private val bassCurvePref by lazy { findPreference<ListPreference>(PREF_BASS_CURVE)!! }
+    private val midPref by lazy { findPreference<SwitchPreferenceCompat>(PREF_MID)!! }
+    private val midLevelPref by lazy { findPreference<DolbySliderPreference>(PREF_MID_LEVEL)!! }
+    private val treblePref by lazy { findPreference<SwitchPreferenceCompat>(PREF_TREBLE)!! }
+    private val trebleLevelPref by lazy {
+        findPreference<DolbySliderPreference>(PREF_TREBLE_LEVEL)!!
+    }
     private val hpVirtPref by lazy { findPreference<SwitchPreferenceCompat>(PREF_HP_VIRTUALIZER)!! }
     private val spkVirtPref by lazy {
         findPreference<SwitchPreferenceCompat>(PREF_SPK_VIRTUALIZER)!!
     }
     private val volumePref by lazy { findPreference<SwitchPreferenceCompat>(PREF_VOLUME)!! }
     private val resetPref by lazy { findPreference<Preference>(PREF_RESET)!! }
+    private val deviceMemoryPref by lazy {
+        findPreference<SwitchPreferenceCompat>(PREF_DEVICE_STATE_MEMORY)!!
+    }
     private val settingsCategory by lazy {
         findPreference<PreferenceCategory>("dolby_category_settings")!!
     }
@@ -105,8 +124,15 @@ class DolbySettingsFragment : SettingsBasePreferenceFragment(), OnPreferenceChan
         stereoPref?.onPreferenceChangeListener = this
         dialoguePref.onPreferenceChangeListener = this
         bassPref.onPreferenceChangeListener = this
+        bassLevelPref.onPreferenceChangeListener = this
+        bassCurvePref.onPreferenceChangeListener = this
+        midPref.onPreferenceChangeListener = this
+        midLevelPref.onPreferenceChangeListener = this
+        treblePref.onPreferenceChangeListener = this
+        trebleLevelPref.onPreferenceChangeListener = this
         volumePref.onPreferenceChangeListener = this
         ieqPref.onPreferenceChangeListener = this
+        deviceMemoryPref.onPreferenceChangeListener = this
 
         resetPref.setOnPreferenceClickListener {
             dolbyController.resetProfileSpecificSettings()
@@ -170,6 +196,33 @@ class DolbySettingsFragment : SettingsBasePreferenceFragment(), OnPreferenceChan
 
             PREF_BASS -> {
                 dolbyController.setBassEnhancerEnabled(newValue as Boolean)
+                updateProfileSpecificPrefs()
+            }
+
+            PREF_BASS_LEVEL -> {
+                dolbyController.setBassLevel(newValue as Int)
+            }
+
+            PREF_BASS_CURVE -> {
+                dolbyController.setBassCurve(newValue.toString().toInt())
+            }
+
+            PREF_MID -> {
+                dolbyController.setMidEnhancerEnabled(newValue as Boolean)
+                updateProfileSpecificPrefs()
+            }
+
+            PREF_MID_LEVEL -> {
+                dolbyController.setMidLevel(newValue as Int)
+            }
+
+            PREF_TREBLE -> {
+                dolbyController.setTrebleEnhancerEnabled(newValue as Boolean)
+                updateProfileSpecificPrefs()
+            }
+
+            PREF_TREBLE_LEVEL -> {
+                dolbyController.setTrebleLevel(newValue as Int)
             }
 
             PREF_VOLUME -> {
@@ -178,6 +231,12 @@ class DolbySettingsFragment : SettingsBasePreferenceFragment(), OnPreferenceChan
 
             PREF_IEQ -> {
                 dolbyController.setIeqPreset(newValue.toString().toInt())
+            }
+
+            PREF_DEVICE_STATE_MEMORY -> {
+                if (newValue as Boolean) {
+                    DolbyEffectService.start(requireContext())
+                }
             }
 
             else -> return false
@@ -223,6 +282,14 @@ class DolbySettingsFragment : SettingsBasePreferenceFragment(), OnPreferenceChan
         hpVirtPref.setEnabled(enable && !isOnSpeaker)
         stereoPref?.setEnabled(enable && !isOnSpeaker)
         bassPref.setEnabled(enable)
+        bassLevelPref.setEnabled(enable && dolbyController.getBassEnhancerEnabled(currentProfile))
+        bassCurvePref.setEnabled(enable && dolbyController.getBassEnhancerEnabled(currentProfile))
+        midPref.setEnabled(enable)
+        midLevelPref.setEnabled(enable && dolbyController.getMidEnhancerEnabled(currentProfile))
+        treblePref.setEnabled(enable)
+        trebleLevelPref.setEnabled(
+            enable && dolbyController.getTrebleEnhancerEnabled(currentProfile)
+        )
 
         if (!enable) return
 
@@ -253,6 +320,12 @@ class DolbySettingsFragment : SettingsBasePreferenceFragment(), OnPreferenceChan
         spkVirtPref.setChecked(dolbyController.getSpeakerVirtEnabled(currentProfile))
         volumePref.setChecked(dolbyController.getVolumeLevelerEnabled(currentProfile))
         bassPref.setChecked(dolbyController.getBassEnhancerEnabled(currentProfile))
+        bassLevelPref.value = dolbyController.getBassLevel(currentProfile)
+        bassCurvePref.value = dolbyController.getBassCurve(currentProfile).toString()
+        midPref.setChecked(dolbyController.getMidEnhancerEnabled(currentProfile))
+        midLevelPref.value = dolbyController.getMidLevel(currentProfile)
+        treblePref.setChecked(dolbyController.getTrebleEnhancerEnabled(currentProfile))
+        trebleLevelPref.value = dolbyController.getTrebleLevel(currentProfile)
 
         // below prefs are not enabled on loudspeaker
         if (isOnSpeaker) {

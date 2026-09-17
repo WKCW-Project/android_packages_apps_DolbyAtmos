@@ -29,18 +29,18 @@ import co.aospa.dolby.geq.data.BandGain
 
 @Composable
 fun BandGainSlider(bandGain: BandGain, onValueChangeFinished: (Int) -> Unit) {
-    // Gain range is of -1->1 in UI, -100->100 in backend, but actually is -10->10 dB.
+    // Gain range is of -1->1 in UI, -150->150 in backend, which is -15->15 dB.
 
     // Ensure we update the slider when gain is changed,
     // for eg. when changing the preset
-    var sliderPosition by remember(bandGain.gain) { mutableFloatStateOf(bandGain.gain / 100f) }
+    var sliderPosition by remember(bandGain.gain) { mutableFloatStateOf(bandGain.gain / 150f) }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        SliderText("%.1f".format(sliderPosition * 10f))
+        SliderText("%.1f".format(sliderPosition * 15f))
         Slider(
             value = sliderPosition,
             onValueChange = { sliderPosition = it },
-            onValueChangeFinished = { onValueChangeFinished((sliderPosition * 100f).toInt()) },
+            onValueChangeFinished = { onValueChangeFinished((sliderPosition * 150f).toInt()) },
             valueRange = -1f..1f,
             modifier =
                 Modifier.graphicsLayer {

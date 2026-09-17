@@ -40,6 +40,17 @@ class DolbyConstants {
         const val PREF_VOLUME = "dolby_volume"
         const val PREF_RESET = "dolby_reset"
 
+        // Lunaris enhancements
+        const val PREF_BASS_LEVEL = "dolby_bass_level"
+        const val PREF_BASS_CURVE = "dolby_bass_curve"
+        const val PREF_MID = "dolby_mid"
+        const val PREF_MID_LEVEL = "dolby_mid_level"
+        const val PREF_TREBLE = "dolby_treble"
+        const val PREF_TREBLE_LEVEL = "dolby_treble_level"
+
+        // Global (not profile specific)
+        const val PREF_DEVICE_STATE_MEMORY = "dolby_device_state_memory"
+
         val PROFILE_SPECIFIC_PREFS =
             setOf(
                 PREF_PRESET,
@@ -50,6 +61,12 @@ class DolbyConstants {
                 PREF_DIALOGUE,
                 PREF_BASS,
                 PREF_VOLUME,
+                PREF_BASS_LEVEL,
+                PREF_BASS_CURVE,
+                PREF_MID,
+                PREF_MID_LEVEL,
+                PREF_TREBLE,
+                PREF_TREBLE_LEVEL,
             )
 
         fun dlog(tag: String, msg: String) {

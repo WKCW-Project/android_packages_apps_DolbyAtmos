@@ -23,5 +23,6 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
         Log.i(TAG, "Boot completed, starting dolby")
         DolbyController.getInstance(context).onBootCompleted()
+        DolbyEffectService.start(context)
     }
 }

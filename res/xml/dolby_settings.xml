@@ -5,6 +5,7 @@
 -->
 <PreferenceScreen
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:title="@string/dolby_title">
 
     <com.android.settingslib.widget.MainSwitchPreference
@@ -65,6 +66,36 @@
             android:key="dolby_bass"
             android:title="@string/dolby_bass_enhancer" />
 
+        <co.aospa.dolby.preference.DolbySliderPreference
+            android:key="dolby_bass_level"
+            android:title="@string/dolby_bass_level"
+            android:defaultValue="0" />
+
+        <ListPreference
+            android:key="dolby_bass_curve"
+            android:entries="@array/dolby_bass_curve_entries"
+            android:entryValues="@array/dolby_bass_curve_values"
+            android:title="@string/dolby_bass_curve"
+            android:summary="%s" />
+
+        <SwitchPreferenceCompat
+            android:key="dolby_mid"
+            android:title="@string/dolby_mid_enhancer" />
+
+        <co.aospa.dolby.preference.DolbySliderPreference
+            android:key="dolby_mid_level"
+            android:title="@string/dolby_mid_level"
+            android:defaultValue="0" />
+
+        <SwitchPreferenceCompat
+            android:key="dolby_treble"
+            android:title="@string/dolby_treble_enhancer" />
+
+        <co.aospa.dolby.preference.DolbySliderPreference
+            android:key="dolby_treble_level"
+            android:title="@string/dolby_treble_level"
+            android:defaultValue="0" />
+
         <SwitchPreferenceCompat
             android:key="dolby_volume"
             android:title="@string/dolby_volume_leveler" />
@@ -72,6 +103,17 @@
         <Preference
             android:key="dolby_reset"
             android:title="@string/dolby_reset_profile" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="dolby_category_adv_settings"
+        android:title="@string/dolby_category_adv_settings">
+
+        <SwitchPreferenceCompat
+            android:key="dolby_device_state_memory"
+            android:title="@string/dolby_device_state_memory_title"
+            android:summary="@string/dolby_device_state_memory_summary" />
 
     </PreferenceCategory>
 

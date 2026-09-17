@@ -19,7 +19,19 @@
     <string name="dolby_unknown">Unknown</string>
     <string name="dolby_on_with_profile">On (%1$s)</string>
     <string name="dolby_category_settings">Settings</string>
+    <string name="dolby_category_adv_settings">Advanced settings</string>
     <string name="dolby_bass_enhancer">Bass enhancer</string>
+    <string name="dolby_bass_level">Bass level</string>
+    <string name="dolby_bass_curve">Bass curve</string>
+    <string name="dolby_bass_curve_balanced">Balanced</string>
+    <string name="dolby_bass_curve_sub_boost">Sub boost</string>
+    <string name="dolby_bass_curve_punch">Punch</string>
+    <string name="dolby_mid_enhancer">Mid enhancer</string>
+    <string name="dolby_mid_level">Mid level</string>
+    <string name="dolby_treble_enhancer">Treble enhancer</string>
+    <string name="dolby_treble_level">Treble level</string>
+    <string name="dolby_device_state_memory_title">Per-device audio memory</string>
+    <string name="dolby_device_state_memory_summary">Remember Dolby settings for each audio device (headphones, speakers, Bluetooth)</string>
     <string name="dolby_dialogue_enhancer">Dialogue enhancer</string>
     <string name="dolby_spk_virtualizer">Speaker virtualization</string>
     <string name="dolby_hp_virtualizer">Headphone virtualization</string>
@@ -33,8 +45,10 @@
     <string name="dolby_profile_dynamic">Dynamic</string>
     <string name="dolby_profile_video">Movie/Video</string>
     <string name="dolby_profile_music">Music</string>
-    <string name="dolby_profile_voice">Voice</string>
-    <string name="dolby_profile_custom">Custom</string>
+    <string name="dolby_profile_game">Game</string>
+    <string name="dolby_profile_work">Work</string>
+    <string name="dolby_profile_casual">Casual</string>
+    <string name="dolby_profile_mood">Mood</string>
 
     <!-- Dolby equalizer presets -->
     <string name="dolby_preset_default">Flat (off)</string>
@@ -45,9 +59,17 @@
     <string name="dolby_preset_hiphop">Hip Hop</string>
     <string name="dolby_preset_blues">Blues</string>
     <string name="dolby_preset_electronic">Electronic</string>
-    <string name="dolby_preset_country">Country</string>
-    <string name="dolby_preset_dance">Dance</string>
     <string name="dolby_preset_metal">Metal</string>
+    <string name="dolby_preset_acoustic">Acoustic</string>
+    <string name="dolby_preset_bass">Bass Boost</string>
+    <string name="dolby_preset_beats">Beats</string>
+    <string name="dolby_preset_clear">Crystal Clear</string>
+    <string name="dolby_preset_deep">Deep</string>
+    <string name="dolby_preset_dubstep">Dubstep</string>
+    <string name="dolby_preset_hardstyle">Hardstyle</string>
+    <string name="dolby_preset_movie">Movie</string>
+    <string name="dolby_preset_rb">R&amp;B</string>
+    <string name="dolby_preset_vocal">Vocal Booster</string>
 
     <!-- Dolby equalizer UI -->
     <string name="dolby_geq_slider_label_gain">Gain</string>
