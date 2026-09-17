@@ -258,16 +258,84 @@ internal class DolbyController private constructor(private val context: Context)
     }
 
     fun getPreset(profile: Int = this.profile): String {
-        val gains = dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile)
-        return gains.joinToString(separator = ",").also { dlog(TAG, "getPreset: $it") }
+        val prefs = profilePrefs(profile)
+        val stored = prefs.getString(DolbyConstants.PREF_PRESET, null)
+        val gains =
+            if (!stored.isNullOrEmpty()) {
+                stored
+            } else {
+                dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile).joinToString(",")
+            }
+        dlog(TAG, "getPreset: $gains")
+        return gains
     }
 
     fun setPreset(value: String, profile: Int = this.profile) {
         dlog(TAG, "setPreset: $value")
         checkEffect()
-        val gains = value.split(",").map { it.toInt() }.toIntArray()
-        dolbyEffect.setDapParameter(DsParam.GEQ_BAND_GAINS, gains, profile)
+        profilePrefs(profile)
+            .edit()
+            .putString(DolbyConstants.PREF_PRESET, value)
+            .apply()
+        applyEnhancedGains(profile)
     }
+
+    // Recomputes the effective GEQ from the stored base preset plus the active
+    // enhancers. The base preset itself is never modified.
+    private fun applyEnhancedGains(profile: Int = this.profile) {
+        checkEffect()
+        val prefs = profilePrefs(profile)
+        val gains = resolveBaseGains(prefs, profile)
+
+        if (prefs.getBoolean(DolbyConstants.PREF_BASS, false)) {
+            val level = readIntPref(prefs, DolbyConstants.PREF_BASS_LEVEL, 0)
+            if (level > 0) {
+                applyBassCurve(
+                    gains,
+                    level,
+                    readIntPref(prefs, DolbyConstants.PREF_BASS_CURVE, 0),
+                    1,
+                )
+            }
+        }
+        if (prefs.getBoolean(DolbyConstants.PREF_MID, false)) {
+            val level = readIntPref(prefs, DolbyConstants.PREF_MID_LEVEL, 0)
+            if (level > 0) {
+                applyBandBoost(gains, MID_BANDS, (level * MID_GAIN_MULTIPLIER).toInt())
+            }
+        }
+        if (prefs.getBoolean(DolbyConstants.PREF_TREBLE, false)) {
+            val level = readIntPref(prefs, DolbyConstants.PREF_TREBLE_LEVEL, 0)
+            if (level > 0) {
+                applyBandBoost(gains, TREBLE_BANDS, (level * TREBLE_GAIN_MULTIPLIER).toInt())
+            }
+        }
+
+        dolbyEffect.setDapParameter(DsParam.GEQ_BAND_GAINS, gains, profile)
+        dlog(TAG, "applyEnhancedGains(profile=$profile): ${gains.joinToString(",")}")
+    }
+
+    // Returns the clean base preset, materializing it on first use so that
+    // enhancers are always applied on top of an unmodified preset.
+    private fun resolveBaseGains(prefs: SharedPreferences, profile: Int): IntArray {
+        val stored = prefs.getString(DolbyConstants.PREF_PRESET, null)
+        if (!stored.isNullOrEmpty()) {
+            val gains = stored.split(",").mapNotNull { it.trim().toIntOrNull() }.toIntArray()
+            if (gains.isNotEmpty()) return gains
+        }
+        val base = dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile).copyOf()
+        prefs.edit().putString(DolbyConstants.PREF_PRESET, base.joinToString(",")).apply()
+        return base
+    }
+
+    private fun applyBandBoost(gains: IntArray, range: IntRange, gain: Int) {
+        for (i in range) {
+            if (i < gains.size) gains[i] = (gains[i] + gain).coerceIn(-150, 150)
+        }
+    }
+
+    private fun profilePrefs(profile: Int): SharedPreferences =
+        context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
 
     fun getPresetName(): String {
         val presets = context.resources.getStringArray(R.array.dolby_preset_values)
@@ -301,84 +369,52 @@ internal class DolbyController private constructor(private val context: Context)
         dolbyEffect.setDapParameter(DsParam.SPEAKER_VIRTUALIZER, value, profile)
     }
 
-    fun getBassEnhancerEnabled(profile: Int = this.profile) =
-        dolbyEffect.getDapParameterBool(DsParam.BASS_ENHANCER_ENABLE, profile).also {
-            dlog(TAG, "getBassEnhancerEnabled: $it")
-        }
+    fun getBassEnhancerEnabled(profile: Int = this.profile): Boolean {
+        val enabled = profilePrefs(profile).getBoolean(DolbyConstants.PREF_BASS, false)
+        dlog(TAG, "getBassEnhancerEnabled: $enabled")
+        return enabled
+    }
 
     fun setBassEnhancerEnabled(value: Boolean, profile: Int = this.profile) {
         dlog(TAG, "setBassEnhancerEnabled: $value")
         checkEffect()
+        profilePrefs(profile)
+            .edit()
+            .putBoolean(DolbyConstants.PREF_BASS, value)
+            .apply()
         dolbyEffect.setDapParameter(DsParam.BASS_ENHANCER_ENABLE, value, profile)
+        applyEnhancedGains(profile)
     }
 
-    fun getBassLevel(profile: Int = this.profile): Int {
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        return readIntPref(prefs, DolbyConstants.PREF_BASS_LEVEL, 0)
-    }
+    fun getBassLevel(profile: Int = this.profile): Int =
+        readIntPref(profilePrefs(profile), DolbyConstants.PREF_BASS_LEVEL, 0)
 
     fun setBassLevel(level: Int, profile: Int = this.profile) {
         dlog(TAG, "setBassLevel: profile=$profile level=$level")
-
         if (level !in 0..100) {
             dlog(TAG, "setBassLevel: invalid level $level")
             return
         }
-
         checkEffect()
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        val previousLevel = readIntPref(prefs, DolbyConstants.PREF_BASS_LEVEL, 0)
-
-        prefs.edit().putInt(DolbyConstants.PREF_BASS_LEVEL, level).apply()
-        setBassEnhancerEnabled(level > 0, profile)
-
-        val currentGains = dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile)
-        val modifiedGains = currentGains.copyOf()
-
-        val curve = readIntPref(prefs, DolbyConstants.PREF_BASS_CURVE, 0)
-        if (previousLevel > 0) {
-            applyBassCurve(modifiedGains, previousLevel, curve, -1)
-        }
-
-        if (level > 0) {
-            applyBassCurve(modifiedGains, level, curve, 1)
-        }
-        dolbyEffect.setDapParameter(DsParam.GEQ_BAND_GAINS, modifiedGains, profile)
-
-        val gainsString = modifiedGains.joinToString(",")
-        prefs.edit().putString(DolbyConstants.PREF_PRESET, gainsString).apply()
+        profilePrefs(profile).edit().putInt(DolbyConstants.PREF_BASS_LEVEL, level).apply()
+        applyEnhancedGains(profile)
     }
 
-    fun getBassCurve(profile: Int = this.profile): Int {
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        return readIntPref(prefs, DolbyConstants.PREF_BASS_CURVE, 0)
-    }
+    fun getBassCurve(profile: Int = this.profile): Int =
+        readIntPref(profilePrefs(profile), DolbyConstants.PREF_BASS_CURVE, 0)
 
     fun setBassCurve(curve: Int, profile: Int = this.profile) {
         dlog(TAG, "setBassCurve: profile=$profile curve=$curve")
-
         if (curve !in 0..2) {
             dlog(TAG, "setBassCurve: invalid curve $curve")
             return
         }
-
         checkEffect()
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        val previousCurve = readIntPref(prefs, DolbyConstants.PREF_BASS_CURVE, 0)
-        val level = readIntPref(prefs, DolbyConstants.PREF_BASS_LEVEL, 0)
-        if (previousCurve == curve) return
-
-        prefs.edit().putString(DolbyConstants.PREF_BASS_CURVE, curve.toString()).apply()
-
-        if (level <= 0) return
-        val currentGains = dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile)
-        val modifiedGains = currentGains.copyOf()
-        applyBassCurve(modifiedGains, level, previousCurve, -1)
-        applyBassCurve(modifiedGains, level, curve, 1)
-        dolbyEffect.setDapParameter(DsParam.GEQ_BAND_GAINS, modifiedGains, profile)
-
-        val gainsString = modifiedGains.joinToString(",")
-        prefs.edit().putString(DolbyConstants.PREF_PRESET, gainsString).apply()
+        profilePrefs(profile)
+            .edit()
+            .putString(DolbyConstants.PREF_BASS_CURVE, curve.toString())
+            .apply()
+        applyEnhancedGains(profile)
     }
 
     private fun applyBassCurve(gains: IntArray, level: Int, curve: Int, direction: Int) {
@@ -391,124 +427,50 @@ internal class DolbyController private constructor(private val context: Context)
         }
     }
 
-    fun getMidEnhancerEnabled(profile: Int = this.profile): Boolean {
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        return prefs.getBoolean(DolbyConstants.PREF_MID, false)
-    }
+    fun getMidEnhancerEnabled(profile: Int = this.profile): Boolean =
+        profilePrefs(profile).getBoolean(DolbyConstants.PREF_MID, false)
 
     fun setMidEnhancerEnabled(value: Boolean, profile: Int = this.profile) {
-        context
-            .getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(DolbyConstants.PREF_MID, value)
-            .apply()
+        dlog(TAG, "setMidEnhancerEnabled: $value")
+        profilePrefs(profile).edit().putBoolean(DolbyConstants.PREF_MID, value).apply()
+        applyEnhancedGains(profile)
     }
 
-    fun getMidLevel(profile: Int = this.profile): Int {
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        return readIntPref(prefs, DolbyConstants.PREF_MID_LEVEL, 0)
-    }
+    fun getMidLevel(profile: Int = this.profile): Int =
+        readIntPref(profilePrefs(profile), DolbyConstants.PREF_MID_LEVEL, 0)
 
     fun setMidLevel(level: Int, profile: Int = this.profile) {
         dlog(TAG, "setMidLevel: profile=$profile level=$level")
-
         if (level !in 0..100) {
             dlog(TAG, "setMidLevel: invalid level $level")
             return
         }
-
         checkEffect()
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        val previousLevel = readIntPref(prefs, DolbyConstants.PREF_MID_LEVEL, 0)
-
-        prefs.edit().putInt(DolbyConstants.PREF_MID_LEVEL, level).apply()
-        setMidEnhancerEnabled(level > 0, profile)
-
-        val currentGains = dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile)
-        val modifiedGains = currentGains.copyOf()
-
-        if (previousLevel > 0) {
-            val previousGain = (previousLevel * MID_GAIN_MULTIPLIER).toInt()
-            for (i in 5..13) {
-                if (i < modifiedGains.size) {
-                    modifiedGains[i] = (modifiedGains[i] - previousGain).coerceIn(-150, 150)
-                }
-            }
-        }
-
-        if (level > 0) {
-            val midGain = (level * MID_GAIN_MULTIPLIER).toInt()
-            for (i in 5..13) {
-                if (i < modifiedGains.size) {
-                    modifiedGains[i] = (modifiedGains[i] + midGain).coerceIn(-150, 150)
-                }
-            }
-        }
-
-        dolbyEffect.setDapParameter(DsParam.GEQ_BAND_GAINS, modifiedGains, profile)
-
-        val gainsString = modifiedGains.joinToString(",")
-        prefs.edit().putString(DolbyConstants.PREF_PRESET, gainsString).apply()
+        profilePrefs(profile).edit().putInt(DolbyConstants.PREF_MID_LEVEL, level).apply()
+        applyEnhancedGains(profile)
     }
 
-    fun getTrebleEnhancerEnabled(profile: Int = this.profile): Boolean {
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        return prefs.getBoolean(DolbyConstants.PREF_TREBLE, false)
-    }
+    fun getTrebleEnhancerEnabled(profile: Int = this.profile): Boolean =
+        profilePrefs(profile).getBoolean(DolbyConstants.PREF_TREBLE, false)
 
     fun setTrebleEnhancerEnabled(value: Boolean, profile: Int = this.profile) {
-        context
-            .getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean(DolbyConstants.PREF_TREBLE, value)
-            .apply()
+        dlog(TAG, "setTrebleEnhancerEnabled: $value")
+        profilePrefs(profile).edit().putBoolean(DolbyConstants.PREF_TREBLE, value).apply()
+        applyEnhancedGains(profile)
     }
 
-    fun getTrebleLevel(profile: Int = this.profile): Int {
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        return readIntPref(prefs, DolbyConstants.PREF_TREBLE_LEVEL, 0)
-    }
+    fun getTrebleLevel(profile: Int = this.profile): Int =
+        readIntPref(profilePrefs(profile), DolbyConstants.PREF_TREBLE_LEVEL, 0)
 
     fun setTrebleLevel(level: Int, profile: Int = this.profile) {
         dlog(TAG, "setTrebleLevel: profile=$profile level=$level")
-
         if (level !in 0..100) {
             dlog(TAG, "setTrebleLevel: invalid level $level")
             return
         }
-
         checkEffect()
-        val prefs = context.getSharedPreferences("profile_$profile", Context.MODE_PRIVATE)
-        val previousLevel = readIntPref(prefs, DolbyConstants.PREF_TREBLE_LEVEL, 0)
-
-        prefs.edit().putInt(DolbyConstants.PREF_TREBLE_LEVEL, level).apply()
-        setTrebleEnhancerEnabled(level > 0, profile)
-
-        val currentGains = dolbyEffect.getDapParameter(DsParam.GEQ_BAND_GAINS, profile)
-        val modifiedGains = currentGains.copyOf()
-
-        if (previousLevel > 0) {
-            val previousGain = (previousLevel * TREBLE_GAIN_MULTIPLIER).toInt()
-            for (i in 14..19) {
-                if (i < modifiedGains.size) {
-                    modifiedGains[i] = (modifiedGains[i] - previousGain).coerceIn(-150, 150)
-                }
-            }
-        }
-
-        if (level > 0) {
-            val trebleGain = (level * TREBLE_GAIN_MULTIPLIER).toInt()
-            for (i in 14..19) {
-                if (i < modifiedGains.size) {
-                    modifiedGains[i] = (modifiedGains[i] + trebleGain).coerceIn(-150, 150)
-                }
-            }
-        }
-
-        dolbyEffect.setDapParameter(DsParam.GEQ_BAND_GAINS, modifiedGains, profile)
-
-        val gainsString = modifiedGains.joinToString(",")
-        prefs.edit().putString(DolbyConstants.PREF_PRESET, gainsString).apply()
+        profilePrefs(profile).edit().putInt(DolbyConstants.PREF_TREBLE_LEVEL, level).apply()
+        applyEnhancedGains(profile)
     }
 
     fun getVolumeLevelerEnabled(profile: Int = this.profile) =
@@ -576,6 +538,9 @@ internal class DolbyController private constructor(private val context: Context)
         private const val BASS_GAIN_MULTIPLIER = 1.4f
         private const val MID_GAIN_MULTIPLIER = 1.3f
         private const val TREBLE_GAIN_MULTIPLIER = 1.5f
+
+        private val MID_BANDS = 5..13
+        private val TREBLE_BANDS = 14..19
 
         private val BASS_CURVES =
             listOf(
